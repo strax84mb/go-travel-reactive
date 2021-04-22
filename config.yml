@@ -1,0 +1,3 @@
+api:
+  listen: ":8081"
+  dbDsn: "gotravelrx:gotravelrx@tcp(localhost:3306)/go_travel_rx"

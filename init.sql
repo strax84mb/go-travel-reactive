@@ -27,6 +27,12 @@ CREATE TABLE cities (
                         PRIMARY KEY (id)
 );
 
+INSERT INTO cities (id, `name`, country) VALUES
+                                                (1, 'Beograd', 'Srbija'),
+                                                (2, 'New York', 'USA'),
+                                                (3, 'Paris', 'France'),
+                                                (4, 'Berlin', 'Deutchland'),
+                                                (5, 'Zagreb', 'Hrvatska');
 
 CREATE TABLE comments (
                           id INTEGER NOT NULL PRIMARY KEY AUTO_INCREMENT,

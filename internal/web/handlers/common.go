@@ -8,6 +8,7 @@ import (
 )
 
 type authService interface {
-	ValidateJwt(r *http.Request, expectedRole entity.UserRole) (string, error)
+	ValidateJwt(ctx context.Context, r *http.Request, expectedRole entity.UserRole) (string, error)
 	Login(ctx context.Context, username, password string) (string, error)
+	SaveUser(ctx context.Context, username, password string) (int, error)
 }

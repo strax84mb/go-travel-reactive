@@ -9,10 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/strax84mb/go-travel-reactive/internal/auth"
-
 	"github.com/gorilla/mux"
 	"github.com/strax84mb/go-travel-reactive/internal/app"
+	"github.com/strax84mb/go-travel-reactive/internal/services/auth"
 	"github.com/strax84mb/go-travel-reactive/internal/storage"
 	"github.com/strax84mb/go-travel-reactive/internal/web/handlers"
 	"gopkg.in/yaml.v3"

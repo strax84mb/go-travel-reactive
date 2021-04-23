@@ -11,6 +11,12 @@ func Ok(w http.ResponseWriter, payload interface{}) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
+func Created(w http.ResponseWriter, payload interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(payload)
+}
+
 func BadRequest(w http.ResponseWriter, message string, details map[string][]string) {
 	writeError(w, http.StatusBadRequest, message, details)
 }

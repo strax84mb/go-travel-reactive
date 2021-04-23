@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -26,15 +27,14 @@ type repository struct {
 	db *sql.DB
 }
 
-func (r *repository) GetUserByUsername(username string) (entity.User, error) {
+// GetUserByUsername input is username
+func (r *repository) GetUserByUsername(ctx context.Context, usernameItem interface{}) (interface{}, error) {
+	username := usernameItem.(string)
 	query := `SELECT id, password, salt, role FROM users WHERE username = ?`
 
 	stmt, err := r.db.Prepare(query)
 	if err != nil {
-		return entity.User{}, ErrPreparingStatement{
-			query: query,
-			cause: err,
-		}
+		return entity.User{}, makeErrPreparingStatement(query, err)
 	}
 
 	defer stmt.Close()
@@ -45,9 +45,10 @@ func (r *repository) GetUserByUsername(username string) (entity.User, error) {
 		Username: username,
 	}
 
-	if err := stmt.QueryRow(username).Scan(&user.ID, &user.Password, &salt, &user.Role); err != nil {
+	err = stmt.QueryRowContext(ctx, username).Scan(&user.ID, &user.Password, &salt, &user.Role)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return entity.User{}, entity.ErrUsernameNotFound{Username: username}
+			return entity.User{}, entity.ErrUsernameNotFound
 		}
 
 		return entity.User{}, ErrQuerying{cause: err}
@@ -58,23 +59,23 @@ func (r *repository) GetUserByUsername(username string) (entity.User, error) {
 	}
 
 	return user, nil
+
 }
 
 // SaveUser returns last inserted ID
-func (r *repository) SaveUser(user entity.User) (int, error) {
+// input is entity.User
+func (r *repository) SaveUser(ctx context.Context, userItem interface{}) (interface{}, error) {
+	user := userItem.(entity.User)
 	query := `INSERT INTO users (username, password, salt, role) VALUES (?, ?, ?, ?)`
 
 	stmt, err := r.db.Prepare(query)
 	if err != nil {
-		return 0, ErrPreparingStatement{
-			query: query,
-			cause: err,
-		}
+		return 0, makeErrPreparingStatement(query, err)
 	}
 
 	defer stmt.Close()
 
-	result, err := stmt.Exec(user.Username, user.Password, hex.EncodeToString(user.Salt), user.Role)
+	result, err := stmt.ExecContext(ctx, user.Username, user.Password, hex.EncodeToString(user.Salt), user.Role)
 	if err != nil {
 		return 0, ErrQuerying{cause: err}
 	}

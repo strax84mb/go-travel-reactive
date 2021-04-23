@@ -1,6 +1,8 @@
 package entity
 
-import "fmt"
+import (
+	"errors"
+)
 
 type UserRole string
 
@@ -18,18 +20,7 @@ type User struct {
 	Role     UserRole
 }
 
-type ErrUsernameNotFound struct {
-	Username string
-}
-
-func (e ErrUsernameNotFound) Error() string {
-	return fmt.Sprintf("username %s not found", e.Username)
-}
-
-type ErrUsernameTaken struct {
-	Username string
-}
-
-func (e ErrUsernameTaken) Error() string {
-	return fmt.Sprintf("username %s is taken", e.Username)
-}
+var (
+	ErrUsernameNotFound = errors.New("username not found")
+	ErrUsernameTaken    = errors.New("username is already taken")
+)

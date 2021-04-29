@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -8,17 +9,18 @@ import (
 	"github.com/strax84mb/go-travel-reactive/internal/entity"
 )
 
-func (r *repository) GetCityByNameAndCountry(name, country string) (entity.City, error) {
+func (r *repository) GetCityByNameAndCountry(ctx context.Context, cityItem interface{}) (interface{}, error) {
+	city := cityItem.(entity.City)
 	query := `SELECT id, name, country FROM cities WHERE LOWER(name) = LOWER(?) AND LOWER(country) = LOWER(?)`
 
-	stmt, err := r.db.Prepare(query)
+	stmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		return entity.City{}, makeErrPreparingStatement(query, err)
 	}
 
-	city := entity.City{}
+	result := entity.City{}
 
-	err = stmt.QueryRow(name, country).Scan(&city.ID, &city.Name, &city.Country)
+	err = stmt.QueryRowContext(ctx, city.Name, city.Country).Scan(&result.ID, &result.Name, &result.Country)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return entity.City{}, entity.ErrCityNotFound
@@ -27,10 +29,12 @@ func (r *repository) GetCityByNameAndCountry(name, country string) (entity.City,
 		return entity.City{}, ErrQuerying{cause: err}
 	}
 
-	return city, nil
+	return result, nil
 }
 
-func (r *repository) AddCity(name, country string) (int, error) {
+func (r *repository) AddCity(ctx context.Context, cityItem interface{}) (interface{}, error) {
+	city := cityItem.(entity.City)
+
 	tx, err := r.db.Begin()
 	if err != nil {
 		return 0, ErrBeginTx{cause: err}
@@ -38,7 +42,7 @@ func (r *repository) AddCity(name, country string) (int, error) {
 
 	query := `SELECT count(id) FROM cities WHERE LOWER(name) = LOWER(?) AND LOWER(country) = LOWER(?)`
 
-	checkStmt, err := tx.Prepare(query)
+	checkStmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
 		return 0, makeErrPreparingStatement(query, err)
 	}
@@ -47,18 +51,18 @@ func (r *repository) AddCity(name, country string) (int, error) {
 
 	var count int
 
-	if err = checkStmt.QueryRow(name, country).Scan(&count); err != nil {
+	if err = checkStmt.QueryRowContext(ctx, city.Name, city.Country).Scan(&count); err != nil {
 		return 0, ErrQuerying{cause: err}
 	}
 
-	stmt, err := tx.Prepare(`INSERT INTO cities (name, country) VALUES (?, ?)`)
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO cities (name, country) VALUES (?, ?)`)
 	if err != nil {
 		return 0, makeErrPreparingStatement(`INSERT INTO users (name, country) VALUES (?, ?)`, err)
 	}
 
 	defer stmt.Close()
 
-	result, err := stmt.Exec(name, country)
+	result, err := stmt.ExecContext(ctx, city.Name, city.Country)
 	if err != nil {
 		return 0, ErrQuerying{cause: err}
 	}
@@ -75,41 +79,42 @@ func (r *repository) AddCity(name, country string) (int, error) {
 	return int(id), nil
 }
 
-func (r *repository) UpdateCity(city entity.City) error {
+func (r *repository) UpdateCity(ctx context.Context, cityItem interface{}) (interface{}, error) {
+	city := cityItem.(entity.City)
 	statement := `UPDATE cities SET name=?, country=? WHERE id=?`
 
-	stmt, err := r.db.Prepare(statement)
+	stmt, err := r.db.PrepareContext(ctx, statement)
 	if err != nil {
-		return makeErrPreparingStatement(statement, err)
+		return false, makeErrPreparingStatement(statement, err)
 	}
 
-	result, err := stmt.Exec(city.Name, city.Country, city.ID)
+	result, err := stmt.ExecContext(ctx, city.Name, city.Country, city.ID)
 	if err != nil {
-		return ErrQuerying{cause: err}
+		return false, ErrQuerying{cause: err}
 	}
 
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("could not get number of affected rows: %w", err)
+		return false, fmt.Errorf("could not get number of affected rows: %w", err)
 	} else if affected == 0 {
-		return entity.ErrCityNotFound
+		return false, entity.ErrCityNotFound
 	}
 
-	return nil
+	return true, nil
 }
 
-func (r *repository) GetCity(id int) (entity.City, error) {
+func (r *repository) GetCity(ctx context.Context, id interface{}) (interface{}, error) {
 	query := `SELECT name, country FROM cities WHERE id=?`
 
-	stmt, err := r.db.Prepare(query)
+	stmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		return entity.City{}, makeErrPreparingStatement(query, err)
 	}
 
 	defer stmt.Close()
 
-	city := entity.City{ID: id}
-	if err = stmt.QueryRow(id).Scan(&city.Name, &city.Country); err != nil {
+	city := entity.City{ID: id.(int)}
+	if err = stmt.QueryRowContext(ctx, id).Scan(&city.Name, &city.Country); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return entity.City{}, entity.ErrCityNotFound
 		}
@@ -120,17 +125,17 @@ func (r *repository) GetCity(id int) (entity.City, error) {
 	return city, nil
 }
 
-func (r *repository) GetAllCities() ([]entity.City, error) {
+func (r *repository) GetAllCities(ctx context.Context, _ interface{}) (interface{}, error) {
 	query := `SELECT id, name, country FROM cities`
 
-	stmt, err := r.db.Prepare(query)
+	stmt, err := r.db.PrepareContext(ctx, query)
 	if err != nil {
 		return nil, makeErrPreparingStatement(query, err)
 	}
 
 	defer stmt.Close()
 
-	rows, err := stmt.Query()
+	rows, err := stmt.QueryContext(ctx)
 	if err != nil {
 		return nil, ErrQuerying{cause: err}
 	}
@@ -153,4 +158,92 @@ func (r *repository) GetAllCities() ([]entity.City, error) {
 	}
 
 	return result, nil
+}
+
+func (r *repository) DeleteCity(ctx context.Context, idItem interface{}) (interface{}, error) {
+	id := idItem.(int)
+
+	tx, err := r.db.Begin()
+	if err != nil {
+		return 0, ErrBeginTx{cause: err}
+	}
+
+	// delete routes
+	query := `DELETE FROM routes WHERE 
+		source_id IN (SELECT id FROM airports WHERE city_id=?) OR 
+		destination_id IN (SELECT id FROM airports WHERE city_id=?)`
+
+	stmt, err := tx.PrepareContext(ctx, query)
+	if err != nil {
+		return 0, makeErrPreparingStatement(query, err)
+	}
+
+	if _, err = stmt.ExecContext(ctx, id, id); err != nil {
+		_ = stmt.Close()
+		return 0, ErrQuerying{cause: err}
+	}
+
+	// delete airports
+	_ = stmt.Close()
+	query = `DELETE FROM airports WHERE city_id=?`
+
+	stmt, err = tx.PrepareContext(ctx, query)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, makeErrPreparingStatement(query, err)
+	}
+
+	if _, err = stmt.ExecContext(ctx, id); err != nil {
+		_, _ = stmt.Close(), tx.Rollback()
+		return 0, ErrQuerying{cause: err}
+	}
+
+	// delete comments
+	_ = stmt.Close()
+	query = `DELETE FROM comments WHERE city_id=?`
+
+	stmt, err = tx.PrepareContext(ctx, query)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, makeErrPreparingStatement(query, err)
+	}
+
+	if _, err = stmt.ExecContext(ctx, id); err != nil {
+		_, _ = stmt.Close(), tx.Rollback()
+		return 0, ErrQuerying{cause: err}
+	}
+
+	// delete city
+	_ = stmt.Close()
+	query = `DELETE FROM cities WHERE id=?`
+
+	stmt, err = tx.PrepareContext(ctx, query)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, makeErrPreparingStatement(query, err)
+	}
+
+	result, err := stmt.ExecContext(ctx, id)
+	if err != nil {
+		_, _ = stmt.Close(), tx.Rollback()
+		return 0, ErrQuerying{cause: err}
+	}
+
+	_ = stmt.Close()
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("could not get number of affected rows: %w", err)
+	} else if count == 0 {
+		_ = tx.Rollback()
+		return 0, entity.ErrCityNotFound
+	}
+
+	if err = tx.Commit(); err != nil {
+		_, _ = stmt.Close(), tx.Rollback()
+		return 0, ErrCommitTx{cause: err}
+	}
+
+	return count, nil
 }

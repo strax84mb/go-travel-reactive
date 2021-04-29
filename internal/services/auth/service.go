@@ -170,7 +170,7 @@ func (a *authService) SaveUser(ctx context.Context, username, password string) (
 			return err
 		}).
 		Map(checkIfUserExists).
-		Join(createAndEncodeUser, rxgo.Just(unp)(), currentTime, rxgo.WithDuration(2*time.Second)).
+		Join(createAndEncodeUser, rxgo.Just(unp)(), currentTime, rxgo.WithDuration(5*time.Second)).
 		Map(a.repo.SaveUser).
 		Observe()
 	if item.Error() {
